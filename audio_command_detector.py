@@ -1,4 +1,3 @@
-# audio_command_detector.py
 import os
 import numpy as np
 import webrtcvad
@@ -9,11 +8,6 @@ import librosa
 import torch
 import torch.nn as nn
 import tensorflow as tf
-from tqdm import tqdm
-import sounddevice as sd
-from pynput import keyboard
-import time
-import soundfile as sf
 from pathlib import Path
 import logging
 
@@ -24,7 +18,7 @@ class AudioCommandDetector:
         # Load the model
         model_path = Path(__file__).parent / "audio_classifier_best.pth"
         self.model = self._init_model()
-        self.model.load_state_dict(torch.load(model_path))
+        self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = self.model.to(self.device)
         self.model.eval()
@@ -36,10 +30,7 @@ class AudioCommandDetector:
         
         # Khởi tạo VAD
         self.vad = webrtcvad.Vad(2)
-        
-        self._preprocessed_audio = None
-        self._mel_spectrogram = None
-        
+
     def _init_model(self):
         """Khởi tạo model ConvMixer"""
         class Residual(nn.Module):
@@ -101,7 +92,7 @@ class AudioCommandDetector:
         speech_mask = np.pad(speech_mask, (0, len(denoised_audio) - len(speech_mask)), mode='constant')
         speech_audio = denoised_audio * speech_mask
 
-        # CAD: 1.5s đoạn có năng lượng cao
+        # Chọn đoạn 1.5s có năng lượng cao
         window_sec = 1.5
         window_len = int(window_sec * rate)
         stride = int(0.2 * rate)
@@ -116,7 +107,6 @@ class AudioCommandDetector:
                 best_segment = window
 
         final_segment = best_segment
-
         segment_len = int(1.0 * rate)
         stride = int(0.02 * rate)
 
@@ -131,15 +121,13 @@ class AudioCommandDetector:
 
         padded_segment = final_segment[best_start:best_start + segment_len]
 
-        # Chuẩn hóa âm lượng (Peak Normalization)
+        # Chuẩn hóa âm lượng
         max_val = np.max(np.abs(padded_segment))
         if max_val > 0:
             padded_segment = padded_segment / max_val * 0.99
 
-        # Chuyển về int16 để ghi WAV
         final_output = (padded_segment * 32767).astype(np.int16)
 
-        # Ghi file WAV nếu có output_path
         if output_path:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             wavfile.write(output_path, rate, final_output)
@@ -147,8 +135,6 @@ class AudioCommandDetector:
         return final_output, rate
 
     def extract_mel_spectrogram(self, audio_data, sr=16000, n_mels=128, n_fft=2048, hop_length=128):
-        """Trích xuất mel spectrogram"""
-        # Extract mel spectrogram
         mel_spec = librosa.feature.melspectrogram(
             y=audio_data.astype(np.float32), 
             sr=sr,
@@ -159,116 +145,35 @@ class AudioCommandDetector:
             fmax=sr/2,
             power=2.0
         )
-        
-        # Convert to log scale (dB)
         mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
-        
-        # Chuẩn hóa về khoảng [0,1]
         mel_spec_norm = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
-        
-        # Resize về kích thước cố định (128, 32)
         mel_spec_norm = tf.image.resize(mel_spec_norm[..., np.newaxis], (128, 32))
         mel_spec_norm = mel_spec_norm.numpy()
         mel_spec_norm = mel_spec_norm[..., 0]
-        
         return mel_spec_norm
 
     def predict(self, audio_file_path):
         try:
-            # Preprocess audio
             preprocessed_audio, sr = self.preprocess_audio(audio_file_path)
-            
-            # Get mel spectrogram
             mel_spec = self.extract_mel_spectrogram(preprocessed_audio, sr)
-            
-            # Chuẩn bị input cho model
             features = torch.FloatTensor(mel_spec).unsqueeze(0).unsqueeze(0).to(self.device)
-            
-            # Dự đoán
             with torch.no_grad():
                 outputs = self.model(features)
                 probabilities = torch.softmax(outputs, dim=1)
                 predicted_class = torch.argmax(outputs, dim=1).item()
                 confidence = probabilities[0][predicted_class].item()
-            
-            # Lấy top 3 predictions
             top3_prob, top3_indices = torch.topk(probabilities[0], 3)
             top3_predictions = [(self.classes[idx], prob.item()) for idx, prob in zip(top3_indices, top3_prob)]
-            
-            # Convert preprocessed audio to list for JSON serialization
             waveform_data = preprocessed_audio.tolist()
-            
             return {
                 'status': 'success',
                 'data': {
                     'predicted_class': self.classes[predicted_class],
                     'confidence': confidence,
                     'top3_predictions': top3_predictions,
-                    'waveform': waveform_data  # Add waveform data
+                    'waveform': waveform_data
                 }
             }
-            
         except Exception as e:
             logger.error(f"Error in prediction: {str(e)}")
             raise e
-
-    def get_preprocessed_audio(self):
-        return self._preprocessed_audio
-
-    def get_mel_spectrogram(self):
-        return self._mel_spectrogram
-
-def record_audio(duration=3, sample_rate=16000):
-    """Ghi âm với độ dài cố định và đợi nút play"""
-    print("Nhấn Enter để bắt đầu ghi âm...")
-    input()  # Đợi người dùng nhấn Enter
-    
-    print("Đang ghi âm...")
-    
-    try:
-        # Ghi âm
-        recording = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='int16')
-        sd.wait()
-        
-        # Lưu file
-        output_path = 'command.wav'
-        wavfile.write(output_path, sample_rate, recording)
-        print(f"Đã lưu file âm thanh tại: {output_path}")
-        return output_path
-    except Exception as e:
-        print(f"Lỗi khi ghi âm: {str(e)}")
-        return None
-
-def main():
-    # Khởi tạo detector
-    detector = AudioCommandDetector()
-    while True:
-        try:
-            # Ghi âm khi nhấn Enter
-            audio_file = record_audio()
-            
-            if audio_file is None:
-                print("Không thể ghi âm. Thử lại...")
-                continue
-            
-            # Dự đoán lệnh
-            result = detector.predict(audio_file)
-            
-            print("\nKết quả dự đoán:")
-            print(f"Lệnh: {result['data']['predicted_class']}")
-            print(f"Độ tin cậy: {result['data']['confidence']:.2%}")
-            print("\nTop 3 dự đoán:")
-            for class_name, prob in result['data']['top3_predictions']:
-                print(f"{class_name}: {prob:.2%}")
-            
-            print("\nNhấn Ctrl+C để thoát hoặc Enter để ghi âm tiếp...")
-            
-        except KeyboardInterrupt:
-            print("\nĐã thoát chương trình.")
-            break
-        except Exception as e:
-            print(f"Lỗi: {str(e)}")
-            continue
-
-if __name__ == "__main__":
-    main()

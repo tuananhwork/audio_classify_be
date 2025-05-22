@@ -39,20 +39,19 @@ detector = AudioCommandDetector()
 
 @app.post("/predict")
 async def predict(audio_file: UploadFile = File(...)):
-    # Create a temporary file
-    temp_file_path = f"temp_{audio_file.filename}"
     try:
-        # Save uploaded file temporarily
-        with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(audio_file.file, buffer)
-        
-        # Check file size (minimum 1.5 seconds)
-        if os.path.getsize(temp_file_path) < 16000 * 2 * 1.5:  # 1.5s * 16kHz * 2 bytes
+        # Tạo file tạm một cách an toàn
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            shutil.copyfileobj(audio_file.file, tmp)
+            temp_file_path = tmp.name
+
+        # Kiểm tra độ dài tối thiểu (1.5s)
+        if os.path.getsize(temp_file_path) < 16000 * 2 * 1.5:
             raise ValueError("File âm thanh quá ngắn. Yêu cầu tối thiểu 1.5 giây.")
-        
-        # Get prediction
+
+        # Gọi hàm dự đoán
         result = detector.predict(temp_file_path)
-        
+
         return {
             "status": "success",
             "data": {
@@ -66,12 +65,10 @@ async def predict(audio_file: UploadFile = File(...)):
         logger.error(f"Error in predict endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Clean up temporary file
-        if 'temp_file_path' in locals():
-            try:
-                os.unlink(temp_file_path)
-            except:
-                pass
+        # Xóa file tạm
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+
 
 @app.get("/health")
 async def health_check():
