@@ -6,6 +6,7 @@ import os
 import shutil
 import logging
 from pathlib import Path
+from fastapi.middleware.cors import CORSMiddleware
 
 from audio_command_detector import AudioCommandDetector
 
@@ -28,14 +29,20 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Dành cho testing (KHÔNG DÙNG CHO production với allow_credentials=True)
+    allow_credentials=False,  # ⚠️ Phải là False nếu dùng "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # Initialize detector
 detector = AudioCommandDetector()
+
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello from FastAPI"}
 
 @app.post("/predict")
 async def predict(audio_file: UploadFile = File(...)):

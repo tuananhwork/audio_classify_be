@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+numpy
+webrtcvad
+noisereduce
+scipy
+pydub
+librosa
+torch
+tensorflow
+python-dotenv
