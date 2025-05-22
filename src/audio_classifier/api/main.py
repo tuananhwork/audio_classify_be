@@ -7,7 +7,7 @@ import shutil
 import logging
 from pathlib import Path
 
-from core.audio_command_detector import AudioCommandDetector
+from audio_classifier.core.audio_command_detector import AudioCommandDetector
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -59,7 +59,7 @@ async def predict(audio_file: UploadFile = File(...)):
                 "predicted_class": result["data"]["predicted_class"],
                 "confidence": float(result["data"]["confidence"]),
                 "top3_predictions": result["data"]["top3_predictions"],
-                "waveform": result["data"]["waveform"]  # Add waveform data
+                "waveform": result["data"]["waveform"]
             }
         }
     except Exception as e:
