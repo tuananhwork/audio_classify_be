@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class AudioCommandDetector:
     def __init__(self):
         # Load the model
-        model_path = Path(__file__).parent.parent.parent / "models" / "audio_classifier_best.pth"
+        model_path = Path(__file__).parent / "audio_classifier_best.pth"
         self.model = self._init_model()
         self.model.load_state_dict(torch.load(model_path))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

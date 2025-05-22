@@ -7,7 +7,7 @@ import shutil
 import logging
 from pathlib import Path
 
-from audio_classifier.core.audio_command_detector import AudioCommandDetector
+from audio_command_detector import AudioCommandDetector
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,8 +22,8 @@ app = FastAPI(
 # CORS configuration
 origins = [
     "http://localhost:5173",  # Local development
-    "https://frontend-2ipecti54-tuananhworks-projects.vercel.app",  # Preview URL
-    "https://frontend-indol-six-79.vercel.app",  # Production URL
+    "https://audioclassify-56pt8nazw-tuananhworks-projects.vercel.app",  # Preview URL
+    "https://audioclassifyfe.vercel.app",  # Production URL
 ]
 
 app.add_middleware(

@@ -1,21 +1,11 @@
 services:
   - type: web
-    name: audio-classifier-be
+    name: audio-command-api
     env: python
     plan: free
-    buildCommand: |
-      pip install -e .
-      pip install -r requirements.txt
-    startCommand: uvicorn audio_classifier.api.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: 'pip install -r requirements.txt'
+    startCommand: 'uvicorn app:app --host 0.0.0.0 --port 8000'
+    autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.0
-      - key: PORT
-        value: 8000
-      - key: ENVIRONMENT
-        value: production
-      - key: CORS_ORIGINS
-        value: '*'
-    healthCheckPath: /docs
-    autoDeploy: true
-    branch: main
+        value: 3.10
