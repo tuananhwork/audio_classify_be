@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: audio-command-api
-    env: docker
-    plan: free
-    dockerfilePath: ./Dockerfile
-    autoDeploy: true
