@@ -25,12 +25,13 @@ origins = [
     "http://localhost:5173",  # Local development
     "https://audioclassify-56pt8nazw-tuananhworks-projects.vercel.app",  # Preview URL
     "https://audioclassifyfe.vercel.app",  # Production URL
+    "https://audio-classify-be.onrender.com",  # Backend URL
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Dành cho testing (KHÔNG DÙNG CHO production với allow_credentials=True)
-    allow_credentials=False,  # ⚠️ Phải là False nếu dùng "*"
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
